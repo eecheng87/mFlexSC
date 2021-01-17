@@ -5,9 +5,9 @@ obj-m := $(MODULE_NAME).o
 all:
 	make -C /lib/modules/`uname -r`/build M=$(PWD) modules
 
-insert:
+ins:
 	sudo insmod $(MODULE_NAME).ko
-remove:
+rm:
 	sudo rmmod $(MODULE_NAME)
 clean:
 	make -C /lib/modules/`uname -r`/build M=$(PWD) clean
