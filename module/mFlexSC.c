@@ -122,6 +122,7 @@ static void qworker(struct work_struct *work) {
     return;
 }
 
+struct flexsc_sysentry *kmap_tmp;
 asmlinkage long sys_flexsc_register(struct flexsc_init_info *info) {
 #if DEBUG
     printk(KERN_INFO "FlexSC register was called\n");
@@ -146,7 +147,7 @@ asmlinkage long sys_flexsc_register(struct flexsc_init_info *info) {
 
     sys_container = (struct flexsc_data_set *)kmalloc(
         sizeof(struct flexsc_data_set) * NUM_SYSENTRY, GFP_KERNEL);
-    entry = (struct flexsc_sysentry *)kmap(pinned_pages[0]);
+    kmap_tmp = entry = (struct flexsc_sysentry *)kmap(pinned_pages[0]);
     for (i = 0; i < NUM_SYSENTRY; i++)
         sys_container[i].__entry = &entry[i];
 
@@ -249,10 +250,13 @@ static void __exit mFlexSC_exit(void) {
     if (sys_works) {
         kfree(sys_works);
     }
-    /*if(worker_task)
-                kthread_stop(worker_task);
-        if(default_task)
-                kthread_stop(default_task);*/
+
+    /* correspond cleanup for kmap */
+    kunmap(kmap_tmp);
+
+    /* clean kthread */
+    if(scanner_task_struct)
+        kthread_stop(scanner_task_struct);
 }
 module_init(mFlexSC_init);
 module_exit(mFlexSC_exit);
