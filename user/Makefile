@@ -1,8 +1,15 @@
 CC = gcc
-OBJS = test.o
-all: test
+DIR1 = ../lib
+SRC = app.c $(DIR1)/flexsc.h $(DIR1)/flexsc.c
+
+all: app
+
 %.o: %.c
 	$(CC) -c -o $@ $<
 
-test: $(OBJS)
-	$(CC) -o $@ $^
+app:
+	$(CC) $(SRC) -pthread -D_GNU_SOURCE -o app
+
+.PHONY: clean app
+clean:
+	rm -f *.o app test

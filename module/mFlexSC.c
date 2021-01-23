@@ -14,7 +14,7 @@
 #include <linux/slab.h>
 #include <linux/workqueue.h>
 
-#include "../lib/flexsc_type.h"
+#include "flexsc_type.h"
 #include "systab.h"
 
 #define DEBUG 1
@@ -72,13 +72,14 @@ int scanner(void *arg) {
 
     while (!kthread_should_stop()) {
         set_current_state(TASK_UNINTERRUPTIBLE);
-
+        /* FIXME: wrong range NUM_SYSENTRY */
         for (i = 0; i < NUM_SYSENTRY; i++) {
             if (entry[i].rstatus == FLEXSC_STATUS_SUBMITTED) {
                 printk("entry[%d].rstatus == SUBMITTED\n", i);
 
                 entry[i].rstatus = FLEXSC_STATUS_BUSY;
                 /* do qworker */
+                /* FIXME: system call handler always execute on defualt cpu */
                 ret = queue_work_on(DEFAULT_CPU, sys_workqueue, &sys_works[i]);
 
                 if (!ret) {
@@ -100,7 +101,11 @@ typedef long (*sys_call_ptr_t)(long, long, long);
 static long do_syscall(unsigned int num, long args[]) {
     /* assume sysnum and sysargs are always valid */
     /* assume always call system call: write */
-    return ((sys_call_ptr_t *)syscall_table)[num](args[0], args[1], args[2]);
+
+    char tmp[8];
+    printk("write para: %ld, %ld, %ld\n", args[0], args[1], args[2]);
+    //copy_from_user(tmp, args[1], args[2]);
+    return ((sys_call_ptr_t *)syscall_table)[num](args[0], (long)tmp, args[2]);
 }
 
 /* routine for work queue */
@@ -111,7 +116,9 @@ static void qworker(struct work_struct *work) {
     struct flexsc_sysentry *entry = container->__entry;
     long ret;
 
+    printk("Enter do syscall\n");
     ret = do_syscall(entry->sysnum, entry->args);
+    printk("Leave do syscall\n");
 
     if (ret == -ENOSYS) {
         printk("Fail to do syscall\n");
@@ -123,15 +130,22 @@ static void qworker(struct work_struct *work) {
 }
 
 struct flexsc_sysentry *kmap_tmp;
-asmlinkage long sys_flexsc_register(struct flexsc_init_info *info) {
+struct page *pinned_pages[1];
+/* after linux kernel 4.7, parameter was restricted into pt_regs type */
+asmlinkage long sys_flexsc_register(const struct __user pt_regs *regs) {
 #if DEBUG
     printk(KERN_INFO "FlexSC register was called\n");
 #endif
+
+    struct flexsc_init_info *info = (struct flexsc_init_info *)kmalloc(sizeof(struct flexsc_init_info),GFP_KERNEL);
+    /* = (struct flexsc_init_info *)regs->di*/;
+    copy_from_user(info, (void *)regs->di, sizeof(struct flexsc_init_info *));
     /* #define current get_current() */
     struct task_struct *cur_task = current;
     struct flexsc_sysentry *entry;
     int n_page, i;
 
+    printk("Address of sysentry: %p\n", &(info->sysentry[0]));
     /* map sys table in user space */
     /* after linux 5.x.x */
     n_page = get_user_pages(
@@ -140,7 +154,7 @@ asmlinkage long sys_flexsc_register(struct flexsc_init_info *info) {
         FOLL_FORCE | FOLL_WRITE, /* Force flag */
         pinned_pages,            /* struct page ** pointer to pinned pages */
         NULL);
-
+    printk("After paging\n");
     if (n_page < 0) {
         printk("Fail to pinning pages\n");
     }
@@ -252,7 +266,7 @@ static void __exit mFlexSC_exit(void) {
     }
 
     /* correspond cleanup for kmap */
-    kunmap(kmap_tmp);
+    kunmap(pinned_pages[0]);
 
     /* clean kthread */
     if(scanner_task_struct)
