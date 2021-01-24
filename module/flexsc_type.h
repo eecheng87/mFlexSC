@@ -38,11 +38,12 @@ struct flexsc_init_info {
 /* mapping sys_work to specific parameter */
 struct flexsc_data_set
 {
-    struct work_struct *__sys_works;
-    struct flexsc_sysentry *__entry;
+    struct work_struct __sys_works;
+    int index; /* index of sysentry */
 };
 
 struct work_struct *sys_works; /* workqueue node */
 struct task_struct *scanner_task_struct;
 struct workqueue_struct *sys_workqueue;
 struct flexsc_data_set *sys_container;
+struct flexsc_sysentry *phy_entry; /* global use */

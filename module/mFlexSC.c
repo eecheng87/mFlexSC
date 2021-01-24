@@ -32,6 +32,8 @@ static void **syscall_table = 0;
 void *syscall_register_ori;
 void *syscall_exit_ori;
 
+struct page *pinned_pages[1];
+
 /*static int worker_task_handler_fn(void *arguments) {
     allow_signal(SIGKILL);
 
@@ -80,7 +82,7 @@ int scanner(void *arg) {
                 entry[i].rstatus = FLEXSC_STATUS_BUSY;
                 /* do qworker */
                 /* FIXME: system call handler always execute on defualt cpu */
-                ret = queue_work_on(DEFAULT_CPU, sys_workqueue, &sys_works[i]);
+                ret = queue_work_on(DEFAULT_CPU, sys_workqueue, &(sys_container[i].__sys_works));
 
                 if (!ret) {
                     printk("sys_work already queued\n");
@@ -97,24 +99,28 @@ int scanner(void *arg) {
     return 0;
 }
 
-typedef long (*sys_call_ptr_t)(long, long, long);
+typedef long (*sys_call_ptr_t)(const struct __user pt_regs *);
 static long do_syscall(unsigned int num, long args[]) {
     /* assume sysnum and sysargs are always valid */
     /* assume always call system call: write */
 
     char tmp[8];
-    printk("write para: %ld, %ld, %ld\n", args[0], args[1], args[2]);
+    printk("sysnum: %d\n", num);
+    struct pt_regs* reg = (struct pt_regs*)kmalloc(sizeof(struct pt_regs), GFP_KERNEL);
     //copy_from_user(tmp, args[1], args[2]);
-    return ((sys_call_ptr_t *)syscall_table)[num](args[0], (long)tmp, args[2]);
+    return ((sys_call_ptr_t *)syscall_table)[39](reg);
 }
 
 /* routine for work queue */
 static void qworker(struct work_struct *work) {
     /* extract entry from data set */
     struct flexsc_data_set *container =
-        container_of(&work, struct flexsc_data_set, __sys_works);
-    struct flexsc_sysentry *entry = container->__entry;
+        container_of(work, struct flexsc_data_set, __sys_works);
+    struct flexsc_sysentry *entry = phy_entry + container->index;
     long ret;
+    struct flexsc_sysentry *ee = (struct flexsc_sysentry *)kmap(pinned_pages[0]);
+
+    printk("--> %d %d\n",entry->sysnum, ee->sysnum);
 
     printk("Enter do syscall\n");
     ret = do_syscall(entry->sysnum, entry->args);
@@ -123,14 +129,17 @@ static void qworker(struct work_struct *work) {
     if (ret == -ENOSYS) {
         printk("Fail to do syscall\n");
     }
-
-    entry->sysret = ret;
-    entry->rstatus = FLEXSC_STATUS_DONE;
+    printk("ret val is %ld\n", ret);
+    int a = FLEXSC_STATUS_DONE;
+    /*copy_to_user(&(entry->rstatus), &a, sizeof(a));
+    copy_to_user(&(entry->sysret), &ret, sizeof(ret));*/
+    ee->sysret = ret;
+    ee->rstatus = FLEXSC_STATUS_DONE;
     return;
 }
 
 struct flexsc_sysentry *kmap_tmp;
-struct page *pinned_pages[1];
+
 /* after linux kernel 4.7, parameter was restricted into pt_regs type */
 asmlinkage long sys_flexsc_register(const struct __user pt_regs *regs) {
 #if DEBUG
@@ -161,24 +170,24 @@ asmlinkage long sys_flexsc_register(const struct __user pt_regs *regs) {
 
     sys_container = (struct flexsc_data_set *)kmalloc(
         sizeof(struct flexsc_data_set) * NUM_SYSENTRY, GFP_KERNEL);
-    kmap_tmp = entry = (struct flexsc_sysentry *)kmap(pinned_pages[0]);
+    phy_entry = entry = (struct flexsc_sysentry *)kmap(pinned_pages[0]);
     for (i = 0; i < NUM_SYSENTRY; i++)
-        sys_container[i].__entry = &entry[i];
+        sys_container[i].index = i;
 
     sys_workqueue = create_workqueue("flexsc_workqueue");
 
-    sys_works = (struct work_struct *)kmalloc(
+    /*sys_works = (struct work_struct *)kmalloc(
         sizeof(struct work_struct) * NUM_SYSENTRY, GFP_KERNEL);
     for (i = 0; i < NUM_SYSENTRY; i++)
-        sys_container[i].__sys_works = &sys_works[i];
+        sys_container[i].__sys_works = sys_works[i];*/
 
-    if (!sys_works) {
+    /*if (!sys_works) {
         printk("Fail to allocate\n");
         return -1;
-    }
+    }*/
 
     for (i = 0; i < NUM_SYSENTRY; i++) {
-        INIT_WORK(&sys_works[i], qworker);
+        INIT_WORK(&(sys_container[i].__sys_works), qworker);
     }
 
     scanner_task_struct =
@@ -261,9 +270,9 @@ static void __exit mFlexSC_exit(void) {
         destroy_workqueue(sys_workqueue);
     }
 
-    if (sys_works) {
+    /*if (sys_works) {
         kfree(sys_works);
-    }
+    }*/
 
     /* correspond cleanup for kmap */
     kunmap(pinned_pages[0]);
