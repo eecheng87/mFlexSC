@@ -23,15 +23,15 @@ int main(){
     }
 
     struct flexsc_sysentry *entry = flexsc_info->sysentry;
-    entry[0].sysnum = 1;
-    entry[0].args[0] = fd;
+    entry[0].sysnum = 39;
+    /*entry[0].args[0] = fd;
     entry[0].args[1] = (long)test;
     entry[0].args[2] = sizeof(test);
-    printf("%ld, %ld, %ld\n", entry[0].args[0], entry[0].args[1], entry[0].args[2]);
+    printf("%ld, %ld, %ld\n", entry[0].args[0], entry[0].args[1], entry[0].args[2]);*/
     entry[0].rstatus = FLEXSC_STATUS_SUBMITTED;
 
     while(entry[0].rstatus != FLEXSC_STATUS_DONE);
-
+    printf("pid: %d\n", entry[0].sysret);
     flexsc_exit();
     ttest();
     return 0;

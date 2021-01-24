@@ -2,8 +2,8 @@
 #define __NR_flexsc_exit 401
 #define NUM_SYSENTRY 64
 
-/* FIXME: only support one cpu now */
-#define NUM_OF_USRCPU 2
+#define NUM_OF_KERCPU 2
+#define KERCPU_BASE 2
 #define DEFAULT_CPU 0
 
 
@@ -47,3 +47,4 @@ struct task_struct *scanner_task_struct;
 struct workqueue_struct *sys_workqueue;
 struct flexsc_data_set *sys_container;
 struct flexsc_sysentry *phy_entry; /* global use */
+int entry_per_kcpu = 0;
