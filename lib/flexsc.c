@@ -3,7 +3,6 @@
 
 #define ENTRY_PER_SYSPAGE 64
 
-static void create_kv_thread(struct flexsc_init_info *info);
 static inline int user_lock_init(void);
 static void __flexsc_register(struct flexsc_init_info *info);
 // static void flexsc_wait(void);
@@ -18,7 +17,7 @@ static void __flexsc_register(struct flexsc_init_info *info) {
 }
 
 /* return empty entry */
-static struct flexsc_sysentry *get_free_syscall_entry(int cpu) {
+struct flexsc_sysentry *get_free_syscall_entry(int cpu) {
 retry:
     pthread_spin_lock(&spin_free_entry[cpu]);
     int i, j;
@@ -32,33 +31,8 @@ retry:
     }
 
     pthread_spin_unlock(&spin_free_entry[cpu]);
-    if (syscall_runner == IDLE)
-        syscall_runner = IN_PROGRESS;
-    else if (syscall_runner == DONE) {
-        puts("warning: get free syscall page at DONE state");
-        syscall_runner = IN_PROGRESS;
-    }
     pthread_yield();
     goto retry;
-}
-
-/* general function to request system call from user space */
-long flexsc_do_syscall(int cpu) {
-    /* for convenient force syscall be `getpid()` in experiment */
-    long retval;
-    struct flexsc_sysentry *entry = entry = get_free_syscall_entry(cpu);
-
-    entry->sysnum = 39;
-    /*
-        entry->args[0] = ...
-
-    */
-    entry->rstatus = FLEXSC_STATUS_SUBMITTED;
-    while (entry->rstatus != FLEXSC_STATUS_DONE) {
-        pthread_yield();
-    }
-    /* status must be FLEXSC_STATUS_FREE now */
-    return entry->sysret;
 }
 
 static void init_cpuinfo_default(struct flexsc_cpuinfo *cpuinfo) {
@@ -112,7 +86,6 @@ static int init_lock_syspage(struct flexsc_init_info *info) {
     return 0;
 }
 
-/* ok */
 static int init_map_syspage(struct flexsc_init_info *info) {
     size_t pgsize = getpagesize();
 
@@ -147,7 +120,6 @@ static int init_map_syspage(struct flexsc_init_info *info) {
     return 0;
 }
 
-/* ok */
 static int init_info_default(struct flexsc_init_info *info) {
     /* Allocate syspage and map it to user space */
     if (init_map_syspage(info) < 0) {
@@ -166,7 +138,6 @@ static int init_info_default(struct flexsc_init_info *info) {
     return 0;
 }
 
-/* ok */
 static int init_info(struct flexsc_init_info *info) {
     return init_info_default(info);
 }
@@ -199,7 +170,8 @@ long flexsc_exit(void) {
 
     ret = syscall(__NR_flexsc_exit);
 
-    pthread_spin_destroy(&spin_free_entry);
+    for(int i = 0; i < NUM_OF_USRCPU; i++)
+        pthread_spin_destroy(&spin_free_entry[i]);
     pthread_spin_destroy(&spin_user_pending);
 
     free(u_info->sysentry);
@@ -216,7 +188,7 @@ static void flexsc_wait(void)
 */
 
 /* create kernel-visible threads for per core */
-static void create_kv_thread(void *(*u_worker)(void *)) {
+void create_kv_thread(void *(*u_worker)(void *)) {
     int i;
 
     /* set user thread's affinity */
@@ -241,11 +213,13 @@ static void create_kv_thread(void *(*u_worker)(void *)) {
     }
     /* spawn user thread */
     for (i = 0; i < USR_THREAD_NUM; i++) {
-        pthread_create(&user_thread[i], &u_attr[i], worker, NULL);
+        int *arg = (int*)malloc(sizeof(int));
+        *arg = (i & 0x1) ? 0 : 1;
+        pthread_create(&user_thread[i], &u_attr[i], u_worker, arg);
     }
 }
 
-static void destroy_kv_thread() {
+void destroy_kv_thread() {
     for (int i = 0; i < USR_THREAD_NUM; i++) {
         pthread_join(user_thread[i], NULL);
     }

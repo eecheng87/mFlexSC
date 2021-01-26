@@ -1,14 +1,4 @@
 #include "flexsc_type.h"
-#include <pthread.h>
-#include <sched.h>
-#include <stdarg.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 /* we use these flags to determine if syscall need handled */
 #define IDLE 1
@@ -32,7 +22,8 @@ pthread_attr_t u_attr[USR_THREAD_NUM];
 cpu_set_t u_cpu[USR_THREAD_NUM];
 
 void ttest();
-
+void create_kv_thread(void *(*u_worker)(void *));
+void destroy_kv_thread();
 static void __flexsc_register(struct flexsc_init_info *);
 static void init_cpuinfo_default(struct flexsc_cpuinfo *);
 static int init_user_affinity(struct flexsc_cpuinfo *);
@@ -42,8 +33,8 @@ static int init_info_default(struct flexsc_init_info *);
 static int init_info(struct flexsc_init_info *);
 struct flexsc_init_info *flexsc_register(struct flexsc_init_info *);
 long flexsc_exit(void);
-static void create_kv_thread(void *(*u_worker)(void *));
-static void destroy_kv_thread();
+struct flexsc_sysentry *get_free_syscall_entry(int);
+
 static inline int user_lock_init(void);
 void flexsc_start_syscall(void);
 long flexsc_do_syscall(int);

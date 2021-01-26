@@ -2,6 +2,7 @@
 #define __NR_flexsc_exit 401
 #define NUM_SYSENTRY 64
 
+#define NUM_OF_USRCPU 2
 #define NUM_OF_KERCPU 2
 #define KERCPU_BASE 2
 #define DEFAULT_CPU 0

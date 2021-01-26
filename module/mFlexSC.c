@@ -41,8 +41,7 @@ int scanner(void *arg) {
     cpu = smp_processor_id();
     allow_signal(SIGKILL);
     /*BUG_ON(DEFAULT_CPU != cpu);*/
-    printk("kthread[%d %d], user[%d, %d] starts\n", current->pid,
-           current->parent->pid, utask->pid, utask->parent->pid);
+
     while (!kthread_should_stop()) {
         /* set_current_state(TASK_UNINTERRUPTIBLE); */
         /* FIXME: wrong range NUM_SYSENTRY */
@@ -123,13 +122,14 @@ asmlinkage long sys_flexsc_register(const struct __user pt_regs *regs) {
     printk(KERN_INFO "FlexSC register was called\n");
 #endif
 
-    struct flexsc_init_info *info = (struct flexsc_init_info *)regs->di;
+    //struct flexsc_init_info *info = (struct flexsc_init_info *)regs->di;
+    struct flexsc_init_info *info = (struct flexsc_init_info *)kmalloc(sizeof(struct flexsc_init_info),GFP_KERNEL);
+    copy_from_user(info, (void *)regs->di, sizeof(struct flexsc_init_info *));
 
     /* #define current get_current() */
     struct task_struct *cur_task = current;
     struct flexsc_sysentry *entry;
     int n_page, i;
-
 #if DEBUG
     printk("Address of sysentry is %p\n", &(info->sysentry[0]));
 #endif

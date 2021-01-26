@@ -1,3 +1,14 @@
+#include <stddef.h>
+#include <pthread.h>
+#include <sched.h>
+#include <stdarg.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 #define __NR_flexsc_register 400
 #define __NR_flexsc_exit 401
 #define NUM_SYSENTRY 64
