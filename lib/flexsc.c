@@ -109,17 +109,6 @@ static int init_lock_syspage(struct flexsc_init_info *info) {
         return -1;
     }
 
-    /*if (!info->write_page) {
-        printf("info->sysentry is NULL at -->> %s\n", __func__);
-        return -1;
-    }
-
-    error = mlock(info->write_page, 100000);
-    if (error) {
-        printf("Failed to mlock `syspage` at -->> %s\n", __func__);
-        return -1;
-    }*/
-
     return 0;
 }
 
