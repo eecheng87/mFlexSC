@@ -6,7 +6,6 @@
 #define KERCPU_BASE 2
 #define DEFAULT_CPU 0
 
-
 /* state for entry in syscall table */
 #define FLEXSC_STATUS_FREE 0
 #define FLEXSC_STATUS_SUBMITTED 1
@@ -28,22 +27,22 @@ struct flexsc_sysentry {
 
 struct flexsc_init_info {
     struct flexsc_sysentry *sysentry; /* Pointer to first sysentry */
-    struct flexsc_cpuinfo cpuinfo; /* cpu bound info */
-    char *write_page; /* shared page for test write() */
-    size_t npages; /* Number of Syspages */
+    struct flexsc_cpuinfo cpuinfo;    /* cpu bound info */
+    char *write_page;                 /* shared page for test write() */
+    size_t npages;                    /* Number of Syspages */
     size_t nentry; /* # of workers should be equal to # of sysentries */
     size_t total_bytes;
 };
 
 /* mapping sys_work to specific parameter */
-struct flexsc_data_set
-{
+struct flexsc_data_set {
     struct work_struct __sys_works;
     int index; /* index of sysentry */
 };
 
 struct work_struct *sys_works; /* workqueue node */
 struct task_struct *scanner_task_struct;
+struct task_struct *utask;
 struct workqueue_struct *sys_workqueue;
 struct flexsc_data_set *sys_container;
 struct flexsc_sysentry *phy_entry; /* global use */

@@ -1,38 +1,54 @@
+/*
+
+    This program is profiling performance use
+
+*/
+
+#include "../lib/flexsc.h"
+#include <fcntl.h>
+#include <pthread.h>
 #include <stdio.h>
-#include <unistd.h>
+#include <string.h>
+#include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include "../lib/flexsc.h"
+#include <unistd.h>
 
 #define test_file "log_file"
-#define test_msg "test_msg"
+#define test_msg "/testmsg"
 
-int main(){
-    int fd;
-    char test[8] = test_msg;
-    fd = open(test_file, O_CREAT | O_WRONLY, S_IWUSR | S_IRUSR | S_IRGRP | S_IWGRP | S_IROTH);
-    /*write(fd, test, sizeof(test));
-    close(fd);*/
-    struct flexsc_init_info *flexsc_info = (struct flexsc_init_info*) malloc(sizeof(struct flexsc_init_info));
+/* thread worker */
+void *worker(void *para) { printf("hihi "); }
 
-    if (flexsc_register(flexsc_info) < 0) {
+int main() {
+    pthread_t thread[USR_THREAD_NUM];
+    int i;
+    // fd = open(test_file, O_CREAT | O_WRONLY, S_IWUSR | S_IRUSR | S_IRGRP |
+    // S_IWGRP | S_IROTH);
+
+    // struct flexsc_init_info *flexsc_info = (struct flexsc_init_info*)
+    // malloc(sizeof(struct flexsc_init_info));
+
+    /*if (flexsc_register(flexsc_info) < 0) {
         printf("Fail to register\n");
         exit(-1);
-    }
+    }*/
 
-    struct flexsc_sysentry *entry = flexsc_info->sysentry;
+    /* create user thread */
+    create_kv_thread(worker);
+
+    /*struct flexsc_sysentry *entry = flexsc_info->sysentry;
     entry[0].sysnum = 39;
-    /*entry[0].args[0] = fd;
-    entry[0].args[1] = (long)test;
-    entry[0].args[2] = sizeof(test);
-    printf("%ld, %ld, %ld\n", entry[0].args[0], entry[0].args[1], entry[0].args[2]);*/
     entry[0].rstatus = FLEXSC_STATUS_SUBMITTED;
 
     while(entry[0].rstatus != FLEXSC_STATUS_DONE);
-    printf("pid: %d\n", entry[0].sysret);
-    flexsc_exit();
+    printf("return value: %d\n", entry[0].sysret);
+    printf("pid: %d\n", getpid());
+    close(fd);*/
+
+    /* join thread */
+    destroy_kv_thread();
+    // flexsc_exit();
     ttest();
     return 0;
 }

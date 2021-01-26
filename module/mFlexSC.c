@@ -41,9 +41,10 @@ int scanner(void *arg) {
     cpu = smp_processor_id();
     allow_signal(SIGKILL);
     /*BUG_ON(DEFAULT_CPU != cpu);*/
-
+    printk("kthread[%d %d], user[%d, %d] starts\n", current->pid,
+           current->parent->pid, utask->pid, utask->parent->pid);
     while (!kthread_should_stop()) {
-        set_current_state(TASK_UNINTERRUPTIBLE);
+        /* set_current_state(TASK_UNINTERRUPTIBLE); */
         /* FIXME: wrong range NUM_SYSENTRY */
         for (i = 0; i < entry_per_kcpu * NUM_OF_KERCPU; i++) {
             if (entry[i].rstatus == FLEXSC_STATUS_SUBMITTED) {
@@ -52,7 +53,8 @@ int scanner(void *arg) {
                 entry[i].rstatus = FLEXSC_STATUS_BUSY;
                 /* do qworker */
                 /* FIXME: system call handler always execute on defualt cpu */
-                ret = queue_work_on(DEFAULT_CPU, sys_workqueue, &(sys_container[i].__sys_works));
+                ret = queue_work_on(DEFAULT_CPU, sys_workqueue,
+                                    &(sys_container[i].__sys_works));
 
                 if (!ret) {
                     printk("sys_work already queued\n");
@@ -70,14 +72,28 @@ int scanner(void *arg) {
 }
 
 typedef long (*sys_call_ptr_t)(const struct __user pt_regs *);
-static long do_syscall(unsigned int num, long args[]) {
+static long do_syscall(unsigned int num, long __user args[]) {
     /* assume sysnum and sysargs are always valid */
-    /* assume always call system call: write */
 
-    printk("sysnum: %d\n", num);
-    struct pt_regs* reg = (struct pt_regs*)kmalloc(sizeof(struct pt_regs), GFP_KERNEL);
+    /*
+        example for get string from entry of syspage:
+        copy_from_user(dest, (void*)args[0], sizeof(dest));
+        no need to copy because already mapping to user space
+    */
+
+    struct pt_regs *reg =
+        (struct pt_regs *)kmalloc(sizeof(struct pt_regs), GFP_KERNEL);
+
+    long ret;
     /* storing argument into register */
-    return ((sys_call_ptr_t *)syscall_table)[num](reg);
+    reg->di = args[0];
+    reg->si = args[1];
+    reg->dx = args[2];
+    reg->r10 = args[3];
+    reg->r8 = args[4];
+    reg->r9 = args[5];
+    ret = ((sys_call_ptr_t *)syscall_table)[num](reg);
+    return ret;
 }
 
 /* routine for work queue */
@@ -87,16 +103,13 @@ static void qworker(struct work_struct *work) {
         container_of(work, struct flexsc_data_set, __sys_works);
     struct flexsc_sysentry *entry = phy_entry + container->index;
     long ret;
- 
-    printk("Enter do syscall\n");
+
     ret = do_syscall(entry->sysnum, entry->args);
-    printk("Leave do syscall\n");
 
     if (ret == -ENOSYS) {
         printk("Fail to do syscall\n");
     }
 
-    printk("ret val is %ld\n", ret);
     entry->sysret = ret;
     entry->rstatus = FLEXSC_STATUS_DONE;
     return;
@@ -121,6 +134,8 @@ asmlinkage long sys_flexsc_register(const struct __user pt_regs *regs) {
     printk("Address of sysentry is %p\n", &(info->sysentry[0]));
 #endif
 
+    utask = current;
+    printk("Current upid is %d\n", utask->pid);
     /* map sys table in user space */
     /* prototype after linux 5.x.x */
     n_page = get_user_pages(
@@ -130,17 +145,15 @@ asmlinkage long sys_flexsc_register(const struct __user pt_regs *regs) {
         pinned_pages,            /* struct page ** pointer to pinned pages */
         NULL);
 
-   /* printk("total bytes: %d\n", info->total_bytes);*/
     entry_per_kcpu = 4096 / (NUM_OF_KERCPU * (sizeof(struct flexsc_sysentry)));
-    printk("entry_per_kcpu: %d\n", entry_per_kcpu);
 
     if (n_page < 0) {
         printk("Fail to pinning pages\n");
     }
-    /* entry_per_kcpu * NUM_OF_KERCPU */
-    
+
     sys_container = (struct flexsc_data_set *)kmalloc(
-        sizeof(struct flexsc_data_set) * entry_per_kcpu * NUM_OF_KERCPU, GFP_KERNEL);
+        sizeof(struct flexsc_data_set) * entry_per_kcpu * NUM_OF_KERCPU,
+        GFP_KERNEL);
     phy_entry = entry = (struct flexsc_sysentry *)kmap(pinned_pages[0]);
     for (i = 0; i < entry_per_kcpu * NUM_OF_KERCPU; i++)
         sys_container[i].index = i;
@@ -202,19 +215,6 @@ static int __init mFlexSC_init(void) {
     /* dis-allow write */
     disallow_writes();
 
-    /*worker_task = kthread_create(worker_task_handler_fn,
-                        (void*)"arguments as char pointer","flex_worker");
-        kthread_bind(worker_task,get_current_cpu);
-
-        set_current_cpu = 2;
-
-        default_task = kthread_create(default_task_handler_fn,
-                                (void*)"arguments as char
-       pointer","flex_default"); kthread_bind(default_task,set_current_cpu);
-
-        wake_up_process(worker_task);
-        wake_up_process(default_task);*/
-
     return 0;
 }
 static void __exit mFlexSC_exit(void) {
@@ -234,7 +234,7 @@ static void __exit mFlexSC_exit(void) {
     kunmap(pinned_pages[0]);
 
     /* clean kthread */
-    if(scanner_task_struct)
+    if (scanner_task_struct)
         kthread_stop(scanner_task_struct);
 }
 module_init(mFlexSC_init);

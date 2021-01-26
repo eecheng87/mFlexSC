@@ -8,7 +8,7 @@ all: app
 	$(CC) -c -o $@ $<
 
 app:
-	$(CC) $(SRC) -pthread -D_GNU_SOURCE -o app
+	$(CC) $(SRC) -pthread -g -D_GNU_SOURCE -o app
 
 .PHONY: clean app
 clean:

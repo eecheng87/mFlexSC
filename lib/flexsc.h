@@ -1,14 +1,14 @@
-#include <sched.h>
+#include "flexsc_type.h"
 #include <pthread.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/mman.h>
+#include <sched.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
-#include "flexsc_type.h"
+#include <sys/types.h>
+#include <unistd.h>
 
 /* we use these flags to determine if syscall need handled */
 #define IDLE 1
@@ -24,6 +24,13 @@
 #define FLEXSC_CPU_1 0x00000002
 #define FLEXSC_CPU_2 0x00000004
 #define FLEXSC_CPU_3 0x00000008
+
+#define USR_THREAD_NUM 30
+
+pthread_t user_thread[USR_THREAD_NUM];
+pthread_attr_t u_attr[USR_THREAD_NUM];
+cpu_set_t u_cpu[USR_THREAD_NUM];
+
 void ttest();
 
 static void __flexsc_register(struct flexsc_init_info *);
@@ -33,11 +40,10 @@ static int init_lock_syspage(struct flexsc_init_info *);
 static int init_map_syspage(struct flexsc_init_info *);
 static int init_info_default(struct flexsc_init_info *);
 static int init_info(struct flexsc_init_info *);
-void print_init_info(struct flexsc_init_info *);
 struct flexsc_init_info *flexsc_register(struct flexsc_init_info *);
 long flexsc_exit(void);
-static void create_kv_thread(struct flexsc_init_info *);
+static void create_kv_thread(void *(*u_worker)(void *));
+static void destroy_kv_thread();
 static inline int user_lock_init(void);
 void flexsc_start_syscall(void);
-
-
+long flexsc_do_syscall(int);
