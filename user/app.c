@@ -54,6 +54,7 @@ void *worker(void *arg) {
             pthread_yield();
         }
         /* status must be FLEXSC_STATUS_FREE now */
+        entry->rstatus = FLEXSC_STATUS_FREE;
 
 #else
         /* normal(synchronous) system call */

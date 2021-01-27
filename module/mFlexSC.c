@@ -38,9 +38,7 @@ struct page *pinned_pages[1];
 int scanner(void *arg) {
     struct flexsc_sysentry *entry = (struct flexsc_sysentry *)arg;
     int i, cpu, ret;
-    cpu = smp_processor_id();
     allow_signal(SIGKILL);
-    /*BUG_ON(DEFAULT_CPU != cpu);*/
 
     while (!kthread_should_stop()) {
         /* set_current_state(TASK_UNINTERRUPTIBLE); */
@@ -48,11 +46,12 @@ int scanner(void *arg) {
         for (i = 0; i < entry_per_kcpu * NUM_OF_KERCPU; i++) {
             if (entry[i].rstatus == FLEXSC_STATUS_SUBMITTED) {
                 printk("entry[%d].rstatus == SUBMITTED\n", i);
-
+                /* force kernel worker bound at cpu3 and cpu4 */
+                /* FIXME: need to change code if config change */
+                cpu = i >= entry_per_kcpu ? 2 : 3;
                 entry[i].rstatus = FLEXSC_STATUS_BUSY;
                 /* do qworker */
-                /* FIXME: system call handler always execute on defualt cpu */
-                ret = queue_work_on(DEFAULT_CPU, sys_workqueue,
+                ret = queue_work_on(cpu, sys_workqueue,
                                     &(sys_container[i].__sys_works));
 
                 if (!ret) {
