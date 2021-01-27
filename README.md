@@ -20,8 +20,18 @@ If FlexSC applied, need to config(define) `FLEXSC` in `app.c`. Otherwise, normal
 ## Overview
 ![](https://i.imgur.com/Od7V5hw.png)
 
-Each kernel visible thread bound in specific CPU, in this project, bound in CPU0 and CPU1. There're several user level threads belong to those CPU and storing information(system call number and its arguments) about request into syscall page. Syscall page is shared memory between kernel space and user space, both can access the information on it. In kernel space, there is a scanner thread ceaselessly searching available entry. If found available(submitted) status, kernel work thread start calling system call requested in user space.
+Each kernel visible thread bound in specific CPU, in this project, bound in CPU1 and CPU2. There're several user level threads belong to those CPU and storing information(system call number and its arguments) about request into syscall page. Syscall page is shared memory between kernel space and user space, both can access the information on it. Also, each kernel visible thread has their own syscall page. In kernel space, there is a scanner thread ceaselessly searching available entry. If found available(submitted) status, kernel work thread(actually I use linux workqueue) start calling system call requested in user space. As same as user space did, I bound groups of kernel threads in CPU3 and CPU4.
 
 ## Experiment
-There're some experiments I made under `/expriment` and it seems that FlexSC get better porformance than normal system call.
+
+There're some experiments I made under `/experiment` and it seems that FlexSC get better porformance than normal system call.
+
 ![](https://i.imgur.com/eJb0hM7.png)
+
+## Reference
+
+[spinlock/flexsc](https://github.com/spinlock/flexsc)
+
+[rupc/flexsc](https://github.com/rupc/flexsc)
+
+[foxhoundsk/FlexSC](https://github.com/foxhoundsk/FlexSC)
